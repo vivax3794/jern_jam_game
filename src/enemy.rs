@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_prototype_debug_lines::*;
 
 use noise::{Fbm, NoiseFn, Seedable};
-use rand::{prelude::*};
+use rand::prelude::*;
 
 pub struct EnemyPlugin;
 
@@ -48,17 +48,22 @@ fn create_starting_path() -> Vec<Vec2> {
     }
 
     let scale_x = 400.0 / max_x;
-    let scale_y = 290.0 / max_y;
+    let scale_y = 250.0 / max_y;
 
-    let path: Vec<Vec2> = path.into_iter().map(|vec| {
-        Vec2::new(vec.x * scale_x, vec.y * scale_y)
-    }).collect();
+    let path: Vec<Vec2> = path
+        .into_iter()
+        .map(|vec| Vec2::new(vec.x * scale_x, vec.y * scale_y))
+        .collect();
 
     path
 }
 
 fn setup_spawner(mut commands: Commands, path: Res<EnemyPath>) {
-    commands.spawn().insert(EnemySpawner(Transform::from_translation(path.0[0].extend(0.0))));
+    commands
+        .spawn()
+        .insert(EnemySpawner(Transform::from_translation(
+            path.0[0].extend(0.0),
+        )));
 }
 
 #[derive(Component)]
@@ -155,7 +160,10 @@ fn move_upwards(
     }
 }
 
-fn enemy_death(mut commands: Commands, query: Query<(Entity, &Health), With<Enemy>>) {
+fn enemy_death(
+    mut commands: Commands,
+    query: Query<(Entity, &Health), (With<Enemy>, Changed<Health>)>,
+) {
     query.for_each(|(entity, health)| {
         if health.0 <= 0. {
             commands.entity(entity).despawn();
@@ -163,7 +171,7 @@ fn enemy_death(mut commands: Commands, query: Query<(Entity, &Health), With<Enem
     })
 }
 
-fn set_size_to_health(mut query: Query<(&mut Transform, &Health), With<Enemy>>) {
+fn set_size_to_health(mut query: Query<(&mut Transform, &Health), (With<Enemy>, Changed<Health>)>) {
     query.for_each_mut(|(mut trans, health)| {
         let scale = health.0 / (START_HEALTH / (MAX_SCALE - MIN_SCALE)) + MIN_SCALE;
 

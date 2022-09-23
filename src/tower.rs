@@ -2,11 +2,15 @@ use bevy::prelude::*;
 use bevy_prototype_debug_lines::*;
 use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*};
 
-use crate::enemy::{self, Enemy};
+use crate::enemy::{self, Enemy, EnemyPath};
+
+use rand::prelude::*;
 
 const Z_INDEX: f32 = 100.;
 const DPS: f32 = 100.0;
 const RANGE: f32 = 150.0;
+
+const TOWER_VARIANCE_RANGE: std::ops::Range<f32> = 50.0..100.0;
 
 #[derive(Component)]
 struct Tower;
@@ -39,7 +43,7 @@ impl TowerBundle {
 pub struct TowerPlugin;
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
-        // app.add_startup_system(create_starting_towers);
+        app.add_startup_system(create_starting_towers);
         app.add_system(add_tower_on_click);
         app.add_system(target_closest_enemy);
     }
@@ -70,29 +74,31 @@ fn add_tower_on_click(
 
             // Spawn tower at click location!
             commands.spawn_bundle(TowerBundle::new_at(world_pos));
-
         }
     }
 }
 
-// fn create_starting_towers(mut commands: Commands, enemy_path: Res<EnemyPath>) {
-//     let mut rng = rand::thread_rng();
+fn create_starting_towers(mut commands: Commands, enemy_path: Res<EnemyPath>) {
+    let mut rng = rand::thread_rng();
     
-//     for _ in 0..5 {
-//         let point = enemy_path.0.choose(&mut rng).unwrap();
-//         let variance = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(-100.0..100.0));
-
-//         let pos = *point + variance;
+    for _ in 0..5 {
+        let point = enemy_path.0.choose(&mut rng).unwrap();
         
-//         commands.spawn_bundle(TowerBundle::new_at(Transform::from_translation(pos.extend(Z_INDEX))));
-//     }
-// }
+        let variance_length = rng.gen_range(TOWER_VARIANCE_RANGE);
+        let variance_angle = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
+        let variance = Vec2::from_angle(variance_angle) * variance_length;
+
+        let pos = *point + variance;
+        
+        commands.spawn_bundle(TowerBundle::new_at(pos));
+    }
+}
 
 fn target_closest_enemy(
     time: Res<Time>,
     mut lines: ResMut<DebugLines>,
     towers: Query<&Transform, With<Tower>>,
-    mut enemies: Query<(&Transform, &mut enemy::Health), With<Enemy>>,
+    mut enemies: Query<(&Transform, &mut enemy::Health), With<Enemy>>,g
 ) {
     for tower in towers.iter() {
         let closest = enemies.iter_mut().min_by(|(a, _), (b, _)| {

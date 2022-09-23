@@ -5,8 +5,8 @@ use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*};
 use crate::enemy::{self, Enemy};
 
 const Z_INDEX: f32 = 100.;
-const DPS: f32 = 300.0;
-const RANGE: f32 = 200.0;
+const DPS: f32 = 100.0;
+const RANGE: f32 = 150.0;
 
 #[derive(Component)]
 struct Tower;
@@ -20,7 +20,7 @@ struct TowerBundle {
 }
 
 impl TowerBundle {
-    pub fn new_at(location: Transform) -> Self {
+    pub fn new_at(location: Vec2) -> Self {
         TowerBundle {
             _m: Tower,
 
@@ -30,7 +30,7 @@ impl TowerBundle {
                     ..default()
                 },
                 DrawMode::Fill(FillMode::color(Color::BLUE)),
-                location,
+                Transform::from_translation(location.extend(Z_INDEX)),
             ),
         }
     }
@@ -39,16 +39,54 @@ impl TowerBundle {
 pub struct TowerPlugin;
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(create_starting_towers);
+        // app.add_startup_system(create_starting_towers);
+        app.add_system(add_tower_on_click);
         app.add_system(target_closest_enemy);
     }
 }
 
-fn create_starting_towers(mut commands: Commands) {
-    // commands.spawn_bundle(TowerBundle::new_at(Transform::from_xyz(50., 0., Z_INDEX)));
-    // commands.spawn_bundle(TowerBundle::new_at(Transform::from_xyz(-150., 150., Z_INDEX)));
-    // commands.spawn_bundle(TowerBundle::new_at(Transform::from_xyz(-30., -250., Z_INDEX)));
+fn add_tower_on_click(
+    mut commands: Commands,
+    buttons: Res<Input<MouseButton>>,
+    windows: Res<Windows>,
+    query: Query<(&Camera, &GlobalTransform)>,
+) {
+    if buttons.just_pressed(MouseButton::Left) {
+        let window = windows.get_primary().unwrap();
+
+        if let Some(position) = window.cursor_position() {
+            // we assume there is only ever one camera
+            let (camera, camera_transform) = query.single();
+
+            let window_size = Vec2::new(
+                window.width() as f32,
+                window.height() as f32,
+            );
+            let gpu_cords = (position / window_size) * 2.0 - Vec2::ONE;
+            let gpu_to_world_matrix = camera_transform.compute_matrix() * camera.projection_matrix().inverse();
+            
+            let world_pos = gpu_to_world_matrix.project_point3(gpu_cords.extend(0.0));
+            let world_pos = world_pos.truncate();
+
+            // Spawn tower at click location!
+            commands.spawn_bundle(TowerBundle::new_at(world_pos));
+
+        }
+    }
 }
+
+// fn create_starting_towers(mut commands: Commands, enemy_path: Res<EnemyPath>) {
+//     let mut rng = rand::thread_rng();
+    
+//     for _ in 0..5 {
+//         let point = enemy_path.0.choose(&mut rng).unwrap();
+//         let variance = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(-100.0..100.0));
+
+//         let pos = *point + variance;
+        
+//         commands.spawn_bundle(TowerBundle::new_at(Transform::from_translation(pos.extend(Z_INDEX))));
+//     }
+// }
 
 fn target_closest_enemy(
     time: Res<Time>,
